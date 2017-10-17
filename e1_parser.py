@@ -19,10 +19,11 @@ def e1_report_json():
                 if index == 0 and j > 0:
                     is_firstCol = True
                     row_name = obj['text'].rsplit(' ', 1)[0]
-                    row_first_num = obj['text'].rsplit(' ', 1)[1]
+                    row_first_num = '0' if obj['text'].rsplit(' ', 1)[1] == '-' else obj['text'].rsplit(' ', 1)[1]
                     row_clean.extend([row_name, row_first_num])
-                else: 
-                    row_clean.append(obj['text'])
+                else:
+                    obj_text = '0' if obj['text'] == '-' else obj['text'] 
+                    row_clean.append(obj_text)
     
         report_clean.append(row_clean)
 
