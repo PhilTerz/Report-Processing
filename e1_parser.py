@@ -1,75 +1,64 @@
 import json
 import tabula
+import pandas as pd
 import pprint
 
-def e1_report_json():
-    # Read pdf into json using tabula
-    report = tabula.read_pdf("E1.pdf", output_format="json", pages="1")
-    report_clean = []
-    spillout_rows = {7, 12, 17, 19, 28, 34, 40, 43}
-    spillout_texts = []
-    # @data: an array of arrays representings rows of the pdf
-    # @obj: the object representations of each element in a row
-    # Get rid of all the spaces created from tabula, noted where height = 0
-    # Report is inconsistent, so standardize all '-' to '0' (they are equivalent in meaning)
-    for j, row in enumerate(report[0]['data']):
-        row_clean = []
+def e1_report_map():
+    labels_index = [0, 5, 7, 8, 9, 10, 12, 13, 15, 17, 4, 19, 24, 25, 28, 29, 30, 36, 37, 40, 45, 47, 48]
+    report = tabula.read_pdf("E1.pdf", pages="2")
+    row_nums = report.iloc[0:49, 15]
+    row_labels = report.iloc[0:49, 0]
+    row_labels_corr = [row_labels[i] for i in labels_index]
+    row_nums_indexed = [row_nums[i] for i in labels_index]
+    row_nums_corr = []
+    for str in row_nums_indexed:
+        str = str.replace(',', '')
+        str = str.replace('$', '')
+        str = float(str)
+        row_nums_corr.append( int(str))
+    report_map = dict(zip(row_labels_corr, row_nums_corr))
 
-        for index, obj in enumerate(row):
-            is_firstCol = False
-            if obj['height'] != 0.0:
-                if j in spillout_rows:
-                    spillout_texts.append( (obj['text'], len(report_clean) - 1) )
-                    break
-                if index == 0 and j > 0 and j != 27 and j != 42:
-                    is_firstCol = True
-                    row_name = obj['text'].rsplit(' ', 1)[0]
-                    row_first_num = '0' if obj['text'].rsplit(' ', 1)[1] == '-' else obj['text'].rsplit(' ', 1)[1]
-                    row_clean.extend([row_name, row_first_num])
-                else:
-                    obj_text = '0' if obj['text'] == '-' else obj['text'] 
-                    row_clean.append(obj_text)
-        #after each row is processed, append the row to the cleaned up matrix
-        if j not in spillout_rows:
-            report_clean.append(row_clean)
+    return report_map
 
-    #after all rows processed, append spillout to previous column label
-    labels1 = ["Assets", "Total Corporate", "Corporate", "Carefree Title", "Total Carefree Title", "Tucson", "Active Adult", "Phoenix", "West Region", "Total Arizona", "Northern California", "Southern California"]
-    labels2 = ["Liabilities", "Total Corporate", "Corporate", "Carefree Title", "Total Carefree Title", "Tucson", "Active Adult", "Phoenix", "West Region", "Total Arizona", "Northern California", "Southern California"]
-    labels3 = ["Stockholders Equity", "Corporate", "Total Corporate", "Carefree Title", "Total Carefree Title", "Tucson", "Active Adult", "Phoenix", "West Region", "Total Arizona", "Northern California", "Southern California"]
-    
-    for txt, row_num in spillout_texts:
-        report_clean[row_num][0] = report_clean[row_num][0] + ' ' + txt
-    report_clean[0] = labels1
-    report_clean[23] = labels2
-    report_clean[35] = labels3
-    
-    #return report_clean
-    tst_index = report_clean[0].index('Phoenix')
-    phx_col = [rowz[tst_index] for rowz in report_clean]
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(phx_col)
 
-    return report_clean
+def biz_report_map():
+    report = tabula.read_pdf("Biz.pdf", pages="1")
+    row_labels = report.iloc[0:26, 0].tolist()
+    del row_labels[14]
+    del row_labels[20] #hard coding deleting the rows of just [label]:nan
+    del row_labels[21]
+    num_strs = report.iloc[0:26, 1].tolist()
+    num_strs = [w for w in num_strs if str(w) != 'nan']
+    nums = []
+    for strs in num_strs:
+        strs = strs.replace(',','')
+        strs = float(strs)
+        strs = int(strs)
+        nums.append(round(strs / 1000))
+    del nums[21]
+    report_map = dict(zip(row_labels, nums))
 
-# @report_clean is the matrix structure generated from e1_report_json()
-# @region is a string, denoting the column label for the region, ex) 'Houston'
-# We need to isolate the column that belongs to this and return the data from 
-# the three tables, Assets, Liabilities, and Stockholders Equity
-def region_map(report_clean, region):
-    region_index = report_clean[0]['data'][0][0].index(region)
-    #map represents the three tables found in the report
-    reg_map = {
-        'Assets': [],
-        'Liabilities': [],
-        'Stockholders Equity': []
-    }
-    # Do I need this?
-    # ON HOLD for now
-
+    return report_map
+ 
 
 def e1_to_file(report_clean):
     with open('tabtest.txt', 'w+') as outfile:
         json.dump(report_clean, outfile, sort_keys=True, indent=2, separators=(',', ': '))
 
-e1_report_json()
+
+def compare_reports():
+    e1_map = e1_report_map()
+    biz_map = biz_report_map()
+    e1_nums = list(e1_map.values())
+    biz_nums = list(biz_map.values())
+    notsame = []
+    x = 0
+
+    for k, v in e1_map.items():
+        if (v ^ int(biz_nums[x])) != 0:
+            notsame.append(k)
+        x += 1
+    for i in notsame:
+        print(i, e1_map[i])
+
+compare_reports()
