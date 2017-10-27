@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import tabula
 import pprint
+import os
 
     # This map isn't final, there are still rows not shown in E1 reports
     # except for in Total Corporate or similar. Low priority, that can 
@@ -33,20 +34,20 @@ e1_bo_labels = {
         'Property, Plant and Equipment': 'Property and Equipment, Net',
         'Spec Homes': 'Spec Homes',
         'Total Liabilities & Equity': 'Total Liabilities and Equity'
-    }
+}
 
 
-def e1_report_map():
+def e1_report_map(fname):
     '''
-    Generates a map of the E1 report to Current Month
+    Generates a map of the E1 report of Current Month
 
     The report is read through tabula into a dataframe. 
-    We get the first two columns and clean up the number to match
+    We get the first two columns and clean up the numbers to match
     the Business Objects report. 
 
     @return {Dictionary} the E1 report row labels to numbers
     '''
-    report = tabula.read_pdf("sanant.pdf", pages="1")
+    report = tabula.read_pdf(fname, pages="1")
     report = report.rename(columns = {"Unnamed: 1" : "First"})
     report = report.dropna(subset = ['First']) #drop all rows that the first numbers are NaN
     row_labels = report.iloc[0:26, 0].tolist() #first column is rows
@@ -77,7 +78,7 @@ def map_e1_bo_labels(e1_map):
     
     return bo_labels
 
-def bo_report_map(bo_labels):
+def bo_report_map(BO_file, BO_col, bo_labels):
     '''
     Once the E1 report is read, we know what we need to check for 
     in the BO report. 
@@ -87,11 +88,11 @@ def bo_report_map(bo_labels):
     @param {List} the list of BO labels that correspond to the E1 report
     @return {Dictionary} the BO report labels to numbers
     '''
-    report = tabula.read_pdf("E1.pdf", pages="2")
+    report = tabula.read_pdf(BO_file, pages="2")
     # Grab only the rows that are provided in the corresponding E1 report
     report = report[report['Assets'].isin(bo_labels)]
     nums_labels = len(bo_labels)
-    row_nums = report.iloc[0:nums_labels, 13] #will need to change '15' here to dymanic column num
+    row_nums = report.iloc[0:nums_labels, BO_col] #will need to change '15' here to dymanic column num
     row_labels = report.iloc[0:nums_labels, 0]
     row_nums_corr = []
     for strs in row_nums:
@@ -103,7 +104,7 @@ def bo_report_map(bo_labels):
 
     return report_map
 
-def main_func():
+def main_func(BO_file, BO_col, fname, division):
     '''
     Pseudo-main function that serves as the entry point for the script. 
         1. Get the E1 map
@@ -114,13 +115,13 @@ def main_func():
 
     @return {List} a list of mismatched tuples, E1 label -> [E1 value, BO value]
     '''
-    e1_map = e1_report_map()
+    e1_map = e1_report_map(fname)
     bo_labels = map_e1_bo_labels(e1_map)
-    bo_map = bo_report_map(bo_labels)
+    bo_map = bo_report_map(BO_file, BO_col, bo_labels)
     #map of "[BO Label]": [BO val, E1 val]
     compares = compare_dict(e1_map, bo_map)
     mismatches = compare(compares)
-    return mismatches
+    return {division: mismatches}
 
 def compare(compares):
     '''
@@ -138,7 +139,7 @@ def compare(compares):
 
 def compare_dict(e1_map, bo_map):
     '''
-    Compare the value of the two reports using the label map. 
+    Create a dictionary of the value of the two reports using the label map. 
 
     @param {Dictionary} e1_map is the E1 label -> value 
     @param {Dictionary} bo_map is the BO label -> value
@@ -154,6 +155,40 @@ def compare_dict(e1_map, bo_map):
 
     return compares
 
+def report_manager():
+    # An array of division labels, pseudo map where index
+    # is the column number for the BO report
+    BO_columns = [""]*16
+    BO_columns[15] = "Houston"
+    BO_columns[13] = "SanAntonio"
+    e1_files = []
+    division_names = []
+    BO_file = ""
+    BO_col = 0
+    for root, dirs, files in os.walk('.', topdown=False):
+      for name in files:
+          if name.startswith("BO"):
+              BO_file = os.path.join(root, name)
+              continue
+          if not name.endswith('.pdf'):
+              continue
+          e1_files.append(os.path.join(root, name))
+          division_names.append(name)
 
-pp = pprint.PrettyPrinter(indent=2)
-pp.pprint(main_func())
+    '''report_differences = {}
+    for fname in e1_files:
+          file_diffs = main_func() #need to add a parameter to this for each filename, keep BO name consistent?
+          report_differences[fname] = file_diffs
+          break'''
+    print(BO_file, e1_files)
+    mismatches = []
+    itr = 0
+    for fname in e1_files:
+      division = division_names[itr].split("_")[0]
+      itr += 1
+      BO_col = BO_columns.index(division)
+      mismatches.append(main_func(BO_file, BO_col, fname, division))
+    pp = pprint.PrettyPrinter(indent=2)
+    pp.pprint(mismatches)
+
+report_manager()
