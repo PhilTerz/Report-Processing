@@ -56,6 +56,8 @@ def e1_report_map(fname):
     # Turn the strings into integers that match the BO report scale
     for strs in num_strs:
         strs = strs.replace(',','')
+        strs = strs.replace("(", "")
+        strs = strs.replace(")", "")
         strs = float(strs)
         strs = int(strs)
         nums.append(round(strs / 1000))
@@ -161,6 +163,7 @@ def report_manager():
     BO_columns = [""]*16
     BO_columns[15] = "Houston"
     BO_columns[13] = "SanAntonio"
+    BO_columns[1] = "MLCHoldings"
     e1_files = []
     division_names = []
     BO_file = ""
