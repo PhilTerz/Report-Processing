@@ -50,8 +50,8 @@ def e1_report_map(fname):
     report = tabula.read_pdf(fname, pages="1")
     report = report.rename(columns = {"Unnamed: 1" : "First"})
     report = report.dropna(subset = ['First']) #drop all rows that the first numbers are NaN
-    row_labels = report.iloc[0:26, 0].tolist() #first column is rows
-    num_strs = report.iloc[0:26, 1].tolist() #second column is current month values
+    row_labels = report.iloc[:, 0].tolist() #first column is rows
+    num_strs = report.iloc[:, 1].tolist() #second column is current month values
     nums = []
     # Turn the strings into integers that match the BO report scale
     for strs in num_strs:
@@ -80,7 +80,7 @@ def map_e1_bo_labels(e1_map):
     
     return bo_labels
 
-def bo_report_map(BO_file, BO_col, bo_labels):
+def bo_report_map(BO_file, division, bo_labels):
     '''
     Once the E1 report is read, we know what we need to check for 
     in the BO report. 
@@ -93,9 +93,11 @@ def bo_report_map(BO_file, BO_col, bo_labels):
     report = tabula.read_pdf(BO_file, pages="2")
     # Grab only the rows that are provided in the corresponding E1 report
     report = report[report['Assets'].isin(bo_labels)]
-    nums_labels = len(bo_labels)
-    row_nums = report.iloc[0:nums_labels, BO_col] #will need to change '15' here to dymanic column num
-    row_labels = report.iloc[0:nums_labels, 0]
+    divisions = list(report.columns.values)
+    divisions = [x.replace(' ', '') for x in divisions]
+    BO_col = divisions.index(division)
+    row_nums = report.iloc[:, BO_col]
+    row_labels = report.iloc[:, 0]
     row_nums_corr = []
     for strs in row_nums:
         strs = strs.replace(',', '')
@@ -106,7 +108,7 @@ def bo_report_map(BO_file, BO_col, bo_labels):
 
     return report_map
 
-def main_func(BO_file, BO_col, fname, division):
+def main_func(BO_file, fname, division):
     '''
     Pseudo-main function that serves as the entry point for the script. 
         1. Get the E1 map
@@ -119,7 +121,7 @@ def main_func(BO_file, BO_col, fname, division):
     '''
     e1_map = e1_report_map(fname)
     bo_labels = map_e1_bo_labels(e1_map)
-    bo_map = bo_report_map(BO_file, BO_col, bo_labels)
+    bo_map = bo_report_map(BO_file, division, bo_labels)
     #map of "[BO Label]": [BO val, E1 val]
     compares = compare_dict(e1_map, bo_map)
     mismatches = compare(compares)
@@ -158,12 +160,6 @@ def compare_dict(e1_map, bo_map):
     return compares
 
 def report_manager():
-    # An array of division labels, pseudo map where index
-    # is the column number for the BO report
-    BO_columns = [""]*16
-    BO_columns[15] = "Houston"
-    BO_columns[13] = "SanAntonio"
-    BO_columns[1] = "MLCHoldings"
     e1_files = []
     division_names = []
     BO_file = ""
@@ -178,19 +174,13 @@ def report_manager():
           e1_files.append(os.path.join(root, name))
           division_names.append(name)
 
-    '''report_differences = {}
-    for fname in e1_files:
-          file_diffs = main_func() #need to add a parameter to this for each filename, keep BO name consistent?
-          report_differences[fname] = file_diffs
-          break'''
     print(BO_file, e1_files)
     mismatches = []
     itr = 0
     for fname in e1_files:
       division = division_names[itr].split("_")[0]
       itr += 1
-      BO_col = BO_columns.index(division)
-      mismatches.append(main_func(BO_file, BO_col, fname, division))
+      mismatches.append(main_func(BO_file, fname, division))
     pp = pprint.PrettyPrinter(indent=2)
     pp.pprint(mismatches)
 
